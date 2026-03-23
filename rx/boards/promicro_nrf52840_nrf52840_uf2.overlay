@@ -1,0 +1,9 @@
+/ {
+	hid_dev_0: hid_dev_0 {
+		compatible = "zephyr,hid-device";
+		label = "Santroller";
+		protocol-code = "none";
+		in-report-size = <7>;
+		in-polling-period-us = <1000>;
+	};
+};

@@ -1,0 +1,55 @@
+/*
+ * Guitar controller buttons overlay for ProMicro nRF52840 (UF2 bootloader).
+ *
+ * Pro Micro pinout — using free GPIO pins:
+ *   D0  = P0.06    D1  = P0.08    D2  = P0.17
+ *   D3  = P0.20    D4  = P0.22    D5  = P0.24
+ *   D6  = P0.13
+ *
+ * Buttons connect pin to GND (active low, internal pull-up).
+ */
+
+/ {
+	aliases {
+		fret0 = &fret_green;
+		fret1 = &fret_red;
+		fret2 = &fret_yellow;
+		fret3 = &fret_blue;
+		fret4 = &fret_orange;
+		strum-up = &btn_strum_up;
+		strum-down = &btn_strum_down;
+	};
+
+	guitar_buttons {
+		compatible = "gpio-keys";
+
+		fret_green: fret_green {
+			gpios = <&gpio0 6 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Fret Green";
+		};
+		fret_red: fret_red {
+			gpios = <&gpio0 8 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Fret Red";
+		};
+		fret_yellow: fret_yellow {
+			gpios = <&gpio0 17 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Fret Yellow";
+		};
+		fret_blue: fret_blue {
+			gpios = <&gpio0 20 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Fret Blue";
+		};
+		fret_orange: fret_orange {
+			gpios = <&gpio0 22 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Fret Orange";
+		};
+		btn_strum_up: btn_strum_up {
+			gpios = <&gpio0 24 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Strum Up";
+		};
+		btn_strum_down: btn_strum_down {
+			gpios = <&gpio0 13 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Strum Down";
+		};
+	};
+};
