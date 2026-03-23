@@ -82,17 +82,11 @@ static void led_set_connected(bool connected)
 static struct bt_conn *active_conn;
 static bool notifications_enabled;
 
-/* ── Debounce ─────────────────────────────────────────────────── */
+/* ── Button send (immediate, no debounce) ─────────────────────── */
 
-/* 1ms debounce: after first edge, wait 1ms then read settled state.
- * Adds 1ms worst-case latency but prevents bounce noise.
- * Set to K_NO_WAIT for zero debounce. */
-#define DEBOUNCE_MS 1
+static struct k_work btn_work;
 
-static void debounce_handler(struct k_work *work);
-static K_WORK_DELAYABLE_DEFINE(debounce_work, debounce_handler);
-
-static void debounce_handler(struct k_work *work)
+static void btn_work_handler(struct k_work *work)
 {
 	uint8_t state = 0;
 
@@ -104,7 +98,6 @@ static void debounce_handler(struct k_work *work)
 
 	button_state = state;
 
-	/* Send notification if state changed */
 	if (state != last_notified_state && active_conn && notifications_enabled) {
 		last_notified_state = state;
 		bt_gatt_notify_uuid(active_conn, &guitar_btn_uuid.uuid,
@@ -121,7 +114,7 @@ static void button_isr(const struct device *dev, struct gpio_callback *cb,
 	ARG_UNUSED(cb);
 	ARG_UNUSED(pins);
 
-	k_work_reschedule(&debounce_work, K_MSEC(DEBOUNCE_MS));
+	k_work_submit(&btn_work);
 }
 
 /* ── GATT Service ─────────────────────────────────────────────── */
@@ -213,6 +206,7 @@ int main(void)
 	LOG_INF("Guitar TX starting");
 
 	k_work_init(&adv_work, adv_work_handler);
+	k_work_init(&btn_work, btn_work_handler);
 
 	/* Init LED — start blinking (searching) */
 	if (gpio_is_ready_dt(&led)) {
