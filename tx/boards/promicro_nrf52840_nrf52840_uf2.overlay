@@ -3,6 +3,11 @@
  * Buttons connect pin to GND (active low, internal pull-up).
  */
 
+#include <zephyr/dt-bindings/regulator/nrf5x.h>
+
+/* Enable DC/DC converter (~40% power savings on radio) */
+&reg1 { regulator-initial-mode = <NRF5X_REG_MODE_DCDC>; };
+
 /* Free up pins used by peripherals we don't need */
 &uart0 { status = "disabled"; };
 &i2c0 { status = "disabled"; };
