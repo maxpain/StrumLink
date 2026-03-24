@@ -9,7 +9,6 @@
 #include <zephyr/kernel.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/gpio.h>
-#include <zephyr/drivers/uart.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
@@ -400,16 +399,6 @@ int main(void)
 
 	/* Init USB */
 	err = usbd_guitar_init();
-
-	/* Wait for DTR */
-	const struct device *console_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_console));
-	if (device_is_ready(console_dev)) {
-		uint32_t dtr = 0;
-		for (int i = 0; i < 50 && !dtr; i++) {
-			uart_line_ctrl_get(console_dev, UART_LINE_CTRL_DTR, &dtr);
-			k_sleep(K_MSEC(100));
-		}
-	}
 
 	printk("\n=== Guitar RX ===\n");
 	printk("USB: %d  HID: %s\n", err, device_is_ready(hid_dev) ? "OK" : "FAIL");

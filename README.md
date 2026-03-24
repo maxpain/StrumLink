@@ -81,10 +81,12 @@ The RX dongle presents as a Santroller Guitar Hero Guitar (VID `0x1209`, PID `0x
 ### Build firmware
 
 ```bash
-./build.sh tx       # build TX (guitar) firmware
-./build.sh rx       # build RX (USB dongle) firmware
-./build.sh all      # build both
-./build.sh shell    # open shell in build container
+./build.sh tx              # debug build (with serial console + logging)
+./build.sh tx release      # production build (no logging, min latency)
+./build.sh rx              # debug build
+./build.sh rx release      # production build
+./build.sh all release     # both in production mode
+./build.sh shell           # open shell in build container
 ```
 
 ### Flash
