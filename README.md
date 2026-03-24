@@ -10,23 +10,19 @@ Ultra low-latency wireless guitar controller for rhythm games (YARG, Clone Hero,
 - **Auto-reconnect** — handles power cycles on either side gracefully
 - **LED indication** — blinking = searching, solid = connected
 - **Auto power-off** — System OFF after 5 min idle (~0.3µA), wakes on any button press
-- **LiPo battery** — charges via USB on the TX board
+- **Battery** — charges via USB on the TX board
 - **DC/DC converter** — ~40% lower power consumption on radio
 - **Debug/release builds** — production build strips all logging for minimum latency
 - **Docker build** — no toolchain installation needed on your machine
 
 ## How it works
 
-```
-Guitar (TX)                              PC
-┌─────────────┐    BLE LLPM 1ms    ┌──────────┐    USB HID    ┌──────┐
-│ ProMicro    │◄──────────────────►│ ProMicro │──────────────►│ YARG │
-│ nRF52840    │    2M PHY          │ nRF52840 │   1000Hz      │      │
-│             │                    │          │               │      │
-│ 11 buttons  │                    │ Santroller│               │      │
-│ LiPo battery│                    │ HID      │               │      │
-└─────────────┘                    └──────────┘               └──────┘
-     TX                                RX (USB dongle)
+```mermaid
+graph LR
+    A["🎸 Guitar Buttons<br>11 inputs + tilt"] -->|GPIO IRQ| B["TX<br>nRF52840"]
+    B -->|"BLE LLPM<br>1ms · 2M PHY"| C["RX<br>nRF52840"]
+    C -->|"USB HID<br>1000Hz"| D["💻 PC<br>YARG / Clone Hero"]
+    E["🔋 Battery"] -.-> B
 ```
 
 TX reads buttons via GPIO interrupts, sends 2-byte bitmask over BLE notification. RX converts to Santroller Guitar Hero Guitar HID report and submits to USB.
