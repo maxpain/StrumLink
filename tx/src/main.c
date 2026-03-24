@@ -13,6 +13,7 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/poweroff.h>
 #include <bluetooth/hci_vs_sdc.h>
 #include <sdc_hci_vs.h>
 
@@ -114,6 +115,30 @@ static void debounce_handler(struct k_work *work)
 	}
 }
 
+/* ── System OFF (deep sleep after 5 min idle) ─────────────────── */
+
+#define IDLE_TIMEOUT_SEC 300
+
+static void system_off_handler(struct k_work *work)
+{
+	LOG_INF("Idle timeout — entering System OFF");
+
+	if (active_conn) {
+		bt_conn_disconnect(active_conn,
+				   BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+		k_sleep(K_MSEC(100));
+	}
+
+	bt_le_adv_stop();
+	gpio_pin_set_dt(&led, 0);
+
+	/* GPIO SENSE is auto-configured from pins with interrupts.
+	 * Any button press (low) wakes the chip (full reset). */
+	sys_poweroff();
+}
+
+static K_WORK_DELAYABLE_DEFINE(idle_work, system_off_handler);
+
 /* ── GPIO ISR ─────────────────────────────────────────────────── */
 
 static void button_isr(const struct device *dev, struct gpio_callback *cb,
@@ -123,6 +148,8 @@ static void button_isr(const struct device *dev, struct gpio_callback *cb,
 	ARG_UNUSED(cb);
 	ARG_UNUSED(pins);
 
+	/* Reset idle timeout on any button press */
+	k_work_reschedule(&idle_work, K_SECONDS(IDLE_TIMEOUT_SEC));
 	k_work_reschedule(&debounce_work, K_MSEC(1));
 }
 
@@ -284,6 +311,9 @@ int main(void)
 		return err;
 	}
 	LOG_INF("Advertising started");
+
+	/* Start idle timeout — System OFF after 5 min no buttons */
+	k_work_schedule(&idle_work, K_SECONDS(IDLE_TIMEOUT_SEC));
 
 	/* All work done in ISR + BLE callbacks */
 	while (1) {
