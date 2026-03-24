@@ -132,7 +132,7 @@ static void submit_hid_report(void)
 
 	uint16_t s = last_button_state;
 
-	uint8_t report[7];
+	static uint8_t report[7] __aligned(4);
 	report[0] = 0x01;
 
 	report[1] = (s & 0x1F)
