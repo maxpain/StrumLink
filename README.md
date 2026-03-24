@@ -6,11 +6,30 @@ Ultra low-latency wireless guitar controller for rhythm games (YARG, Clone Hero,
 
 - **~2ms total latency** — BLE LLPM (1ms connection interval) + 2M PHY + USB HID 1000Hz
 - **Santroller-compatible** — auto-detected by YARG/PlasticBand as Guitar Hero Guitar, no manual configuration needed
+- **11 inputs** — 5 frets, strum up/down, tilt, start, select, guide + auto whammy
 - **Auto-reconnect** — handles power cycles on either side gracefully
 - **LED indication** — blinking = searching, solid = connected
 - **Auto power-off** — System OFF after 5 min idle (~0.3µA), wakes on any button press
 - **LiPo battery** — charges via USB on the TX board
+- **DC/DC converter** — ~40% lower power consumption on radio
+- **Debug/release builds** — production build strips all logging for minimum latency
 - **Docker build** — no toolchain installation needed on your machine
+
+## How it works
+
+```
+Guitar (TX)                              PC
+┌─────────────┐    BLE LLPM 1ms    ┌──────────┐    USB HID    ┌──────┐
+│ ProMicro    │◄──────────────────►│ ProMicro │──────────────►│ YARG │
+│ nRF52840    │    2M PHY          │ nRF52840 │   1000Hz      │      │
+│             │                    │          │               │      │
+│ 11 buttons  │                    │ Santroller│               │      │
+│ LiPo battery│                    │ HID      │               │      │
+└─────────────┘                    └──────────┘               └──────┘
+     TX                                RX (USB dongle)
+```
+
+TX reads buttons via GPIO interrupts, sends 2-byte bitmask over BLE notification. RX converts to Santroller Guitar Hero Guitar HID report and submits to USB.
 
 ## Latency comparison
 
@@ -25,7 +44,7 @@ Ultra low-latency wireless guitar controller for rhythm games (YARG, Clone Hero,
 
 ## Hardware
 
-Two **ProMicro nRF52840** boards (or Nice!Nano v2 / SuperMini nRF52840 clones):
+Two **ProMicro nRF52840** boards (or Nice!Nano v2 / SuperMini nRF52840 clones, ~$5 each):
 
 - **TX** (guitar) — reads buttons via GPIO interrupts, sends over BLE, battery powered
 - **RX** (USB dongle) — receives BLE notifications, outputs USB HID gamepad
@@ -115,31 +134,38 @@ cp update-nice_nano_bootloader-0.10.0_nosd.uf2 /Volumes/NICENANO/
 - **nRF Connect SDK v3.2.4** (Zephyr RTOS)
 - **SoftDevice Controller** with LLPM (Low Latency Packet Mode)
 - **BLE 2M PHY** — required for LLPM 1ms connection interval
-- **NCS bt_scan + bt_gatt_dm** — proper LLPM-aware scanning and GATT discovery
-- **USB HID** (Zephyr USB device next stack) — composite CDC ACM + HID
+- **NCS bt_scan + bt_gatt_dm** — LLPM-aware scanning and GATT discovery
+- **USB HID** (Zephyr USB device next stack) — Santroller GH Guitar format
+- **Dedicated notify thread** — avoids system workqueue deadlock
+- **Async HID submit** — non-blocking USB report submission
 - Board target: `promicro_nrf52840/nrf52840/uf2`
 - Build flag: `--no-sysbuild` (required for correct UF2 flash offset)
 
 ## Known issues
 
 - **macOS Apple Silicon** caps USB HID polling at 500Hz (2ms) even though the device requests 1000Hz (1ms). This is an Apple limitation.
+- **LLPM is Nordic proprietary** — requires Nordic nRF52/nRF54 chips on both TX and RX. Standard BLE minimum is 7.5ms.
 
 ## Project structure
 
 ```
-├── Dockerfile          # NCS SDK + Zephyr SDK build environment
-├── build.sh            # Build script (Docker-based)
-├── tx/                 # TX firmware (guitar, BLE peripheral)
+├── Dockerfile              # NCS SDK + Zephyr SDK build environment
+├── build.sh                # Build script (Docker-based)
+├── tx/                     # TX firmware (guitar, BLE peripheral)
 │   ├── CMakeLists.txt
-│   ├── prj.conf
-│   ├── boards/         # Board overlay (GPIO pin mapping)
+│   ├── prj.conf            # Base config
+│   ├── debug.conf          # Debug overlay (logging, serial console)
+│   ├── release.conf        # Production overlay (no logging, -Os)
+│   ├── boards/             # Board overlay (GPIO pins, DC/DC, SENSE)
 │   └── src/main.c
-├── rx/                 # RX firmware (dongle, BLE central + USB HID)
+├── rx/                     # RX firmware (dongle, BLE central + USB HID)
 │   ├── CMakeLists.txt
-│   ├── prj.conf
-│   ├── boards/         # Board overlay (HID device node)
+│   ├── prj.conf            # Base config
+│   ├── debug.conf          # Debug overlay
+│   ├── release.conf        # Production overlay (pure HID, no CDC ACM)
+│   ├── boards/             # Board overlay (HID device node)
 │   └── src/main.c
-└── monitor.sh          # Serial log monitor (for debugging)
+└── monitor.sh              # Serial log monitor (for debug builds)
 ```
 
 ## License
