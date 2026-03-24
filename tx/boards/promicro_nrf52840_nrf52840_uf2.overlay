@@ -1,13 +1,17 @@
 /*
  * Guitar controller buttons overlay for ProMicro nRF52840 (UF2 bootloader).
- *
- * Pro Micro pinout — using free GPIO pins:
- *   D0  = P0.06    D1  = P0.08    D2  = P0.17
- *   D3  = P0.20    D4  = P0.22    D5  = P0.24
- *   D6  = P0.13
- *
  * Buttons connect pin to GND (active low, internal pull-up).
  */
+
+/* Free up pins used by peripherals we don't need */
+&uart0 { status = "disabled"; };
+&i2c0 { status = "disabled"; };
+&i2c1 { status = "disabled"; };
+&spi2 { status = "disabled"; };
+
+/* Use SENSE mechanism for GPIO interrupts (no 8-channel GPIOTE limit) */
+&gpio0 { sense-edge-mask = <0xFFFFFFFF>; };
+&gpio1 { sense-edge-mask = <0xFFFFFFFF>; };
 
 / {
 	aliases {
@@ -18,38 +22,58 @@
 		fret4 = &fret_orange;
 		strum-up = &btn_strum_up;
 		strum-down = &btn_strum_down;
+		tilt = &btn_tilt;
+		start = &btn_start;
+		select = &btn_select;
+		guide = &btn_guide;
 	};
 
 	guitar_buttons {
 		compatible = "gpio-keys";
 
 		fret_green: fret_green {
-			gpios = <&gpio0 6 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
-			label = "Fret Green";
+			gpios = <&gpio0 17 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Fret Green (D2)";
 		};
 		fret_red: fret_red {
-			gpios = <&gpio0 8 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
-			label = "Fret Red";
+			gpios = <&gpio0 20 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Fret Red (D3)";
 		};
 		fret_yellow: fret_yellow {
-			gpios = <&gpio0 17 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
-			label = "Fret Yellow";
+			gpios = <&gpio0 22 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Fret Yellow (D4)";
 		};
 		fret_blue: fret_blue {
-			gpios = <&gpio0 20 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
-			label = "Fret Blue";
+			gpios = <&gpio0 24 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Fret Blue (D5)";
 		};
 		fret_orange: fret_orange {
-			gpios = <&gpio0 22 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
-			label = "Fret Orange";
+			gpios = <&gpio1 0 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Fret Orange (D6)";
 		};
 		btn_strum_up: btn_strum_up {
-			gpios = <&gpio0 24 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
-			label = "Strum Up";
+			gpios = <&gpio1 4 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Strum Up (104)";
 		};
 		btn_strum_down: btn_strum_down {
-			gpios = <&gpio0 13 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
-			label = "Strum Down";
+			gpios = <&gpio1 6 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Strum Down (106)";
+		};
+		btn_tilt: btn_tilt {
+			gpios = <&gpio0 6 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Tilt (D1)";
+		};
+		btn_start: btn_start {
+			gpios = <&gpio0 10 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Start (010)";
+		};
+		btn_select: btn_select {
+			gpios = <&gpio1 11 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Select (111)";
+		};
+		btn_guide: btn_guide {
+			gpios = <&gpio0 9 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Guide (009)";
 		};
 	};
 };

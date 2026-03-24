@@ -38,7 +38,11 @@ static struct bt_uuid_128 guitar_btn_uuid = BT_UUID_INIT_128(
 #define BTN_ORANGE     4
 #define BTN_STRUM_UP   5
 #define BTN_STRUM_DOWN 6
-#define NUM_BUTTONS    7
+#define BTN_TILT       7
+#define BTN_START      8
+#define BTN_SELECT     9
+#define BTN_GUIDE      10
+#define NUM_BUTTONS    11
 
 static const struct gpio_dt_spec buttons[NUM_BUTTONS] = {
 	GPIO_DT_SPEC_GET(DT_ALIAS(fret0), gpios),
@@ -48,11 +52,15 @@ static const struct gpio_dt_spec buttons[NUM_BUTTONS] = {
 	GPIO_DT_SPEC_GET(DT_ALIAS(fret4), gpios),
 	GPIO_DT_SPEC_GET(DT_ALIAS(strum_up), gpios),
 	GPIO_DT_SPEC_GET(DT_ALIAS(strum_down), gpios),
+	GPIO_DT_SPEC_GET(DT_ALIAS(tilt), gpios),
+	GPIO_DT_SPEC_GET(DT_ALIAS(start), gpios),
+	GPIO_DT_SPEC_GET(DT_ALIAS(select), gpios),
+	GPIO_DT_SPEC_GET(DT_ALIAS(guide), gpios),
 };
 
 static struct gpio_callback btn_cb[NUM_BUTTONS];
-static volatile uint8_t button_state;
-static uint8_t last_notified_state;
+static volatile uint16_t button_state;
+static uint16_t last_notified_state;
 
 /* ── LED indicator ────────────────────────────────────────────── */
 
@@ -82,13 +90,14 @@ static void led_set_connected(bool connected)
 static struct bt_conn *active_conn;
 static bool notifications_enabled;
 
-/* ── Button send (immediate, no debounce) ─────────────────────── */
+/* ── Button send (1ms debounce) ────────────────────────────────── */
 
-static struct k_work btn_work;
+static void debounce_handler(struct k_work *work);
+static K_WORK_DELAYABLE_DEFINE(debounce_work, debounce_handler);
 
-static void btn_work_handler(struct k_work *work)
+static void debounce_handler(struct k_work *work)
 {
-	uint8_t state = 0;
+	uint16_t state = 0;
 
 	for (int i = 0; i < NUM_BUTTONS; i++) {
 		if (gpio_pin_get_dt(&buttons[i])) {
@@ -114,7 +123,7 @@ static void button_isr(const struct device *dev, struct gpio_callback *cb,
 	ARG_UNUSED(cb);
 	ARG_UNUSED(pins);
 
-	k_work_submit(&btn_work);
+	k_work_reschedule(&debounce_work, K_MSEC(1));
 }
 
 /* ── GATT Service ─────────────────────────────────────────────── */
@@ -206,7 +215,6 @@ int main(void)
 	LOG_INF("Guitar TX starting");
 
 	k_work_init(&adv_work, adv_work_handler);
-	k_work_init(&btn_work, btn_work_handler);
 
 	/* Init LED — start blinking (searching) */
 	if (gpio_is_ready_dt(&led)) {

@@ -124,22 +124,47 @@ static int usbd_guitar_init(void)
 
 static const struct device *hid_dev;
 
-static void send_hid_report(uint8_t button_state)
+/*
+ * TX bitmask (16 bits):
+ *   0=Green, 1=Red, 2=Yellow, 3=Blue, 4=Orange,
+ *   5=StrumUp, 6=StrumDown, 7=Tilt, 8=Start, 9=Select, 10=Guide
+ *
+ * Santroller GH Guitar report (7 bytes):
+ *   [0] Report ID = 0x01
+ *   [1] Green=b0, Red=b1, Yellow=b2, Blue=b3, Orange=b4, 0=b5, Select=b6, Start=b7
+ *   [2] Guide=b0, padding
+ *   [3] Hat: 0=StrumUp, 4=StrumDown, 8=Neutral
+ *   [4] Whammy
+ *   [5] Slider
+ *   [6] Tilt (0x80=center, 0xFF=tilted)
+ */
+static void send_hid_report(const uint8_t *data, uint16_t len)
 {
+	uint16_t s = 0;
+	if (len >= 2) s = data[0] | (data[1] << 8);
+	else if (len >= 1) s = data[0];
+
 	uint8_t report[7];
 	report[0] = 0x01;
-	report[1] = button_state & 0x1F;
-	report[2] = 0x00;
 
-	bool strum_up = (button_state >> 5) & 1;
-	bool strum_down = (button_state >> 6) & 1;
+	/* Byte 1: Green=b0..Orange=b4, Select=b6, Start=b7 */
+	report[1] = (s & 0x1F)               /* frets b0-b4 */
+		  | (((s >> 9) & 1) << 6)    /* select → b6 */
+		  | (((s >> 8) & 1) << 7);   /* start  → b7 */
+
+	/* Byte 2: Guide=b0 */
+	report[2] = (s >> 10) & 1;
+
+	/* Byte 3: Hat switch (strum) */
+	bool strum_up = (s >> 5) & 1;
+	bool strum_down = (s >> 6) & 1;
 	if (strum_up && !strum_down) report[3] = 0;
 	else if (strum_down && !strum_up) report[3] = 4;
 	else report[3] = 8;
 
-	report[4] = 0x00;
-	report[5] = 0x00;
-	report[6] = 0x80;
+	report[4] = 0xFF; /* Whammy always active */
+	report[5] = 0x00; /* Slider */
+	report[6] = ((s >> 7) & 1) ? 0xFF : 0x80; /* Tilt */
 
 	hid_device_submit_report(hid_dev, sizeof(report), report);
 }
@@ -203,7 +228,7 @@ static uint8_t on_notify(struct bt_conn *conn,
 	}
 
 	if (length >= 1) {
-		send_hid_report(((const uint8_t *)data)[0]);
+		send_hid_report(data, length);
 	}
 
 	return BT_GATT_ITER_CONTINUE;
