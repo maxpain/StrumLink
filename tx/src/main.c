@@ -91,6 +91,30 @@ static void led_set_connected(bool connected)
 static struct bt_conn *active_conn;
 static bool notifications_enabled;
 
+/* ── Notify thread (avoids deadlock on system workqueue) ──────── */
+
+extern const struct bt_gatt_attr attr_guitar_svc[];
+
+static K_SEM_DEFINE(notify_sem, 0, 1);
+
+static void notify_thread_fn(void *p1, void *p2, void *p3)
+{
+	while (1) {
+		k_sem_take(&notify_sem, K_FOREVER);
+		uint16_t state = button_state;
+		if (state != last_notified_state && active_conn &&
+		    notifications_enabled) {
+			last_notified_state = state;
+			/* Pre-resolved attr (index 2 = char value) — no UUID search */
+			bt_gatt_notify(active_conn, &attr_guitar_svc[2],
+				       &state, sizeof(state));
+		}
+	}
+}
+
+K_THREAD_DEFINE(notify_tid, 512, notify_thread_fn, NULL, NULL, NULL,
+		K_PRIO_PREEMPT(7), 0, 0);
+
 /* ── Button send (1ms debounce) ────────────────────────────────── */
 
 static void debounce_handler(struct k_work *work);
@@ -107,12 +131,7 @@ static void debounce_handler(struct k_work *work)
 	}
 
 	button_state = state;
-
-	if (state != last_notified_state && active_conn && notifications_enabled) {
-		last_notified_state = state;
-		bt_gatt_notify_uuid(active_conn, &guitar_btn_uuid.uuid,
-				    NULL, &state, sizeof(state));
-	}
+	k_sem_give(&notify_sem);
 }
 
 /* ── System OFF (deep sleep after 5 min idle) ─────────────────── */
@@ -217,7 +236,7 @@ static void on_disconnected(struct bt_conn *conn, uint8_t reason)
 		active_conn = NULL;
 	}
 	notifications_enabled = false;
-	last_notified_state = 0xFF;
+	last_notified_state = 0xFFFF;
 	/* Don't restart adv here — wait for recycled callback */
 }
 

@@ -124,9 +124,12 @@ static int usbd_guitar_init(void)
 static const struct device *hid_dev;
 static uint16_t last_button_state;
 static uint8_t whammy_toggle;
+static struct k_mutex report_mutex;
 
 static void submit_hid_report(void)
 {
+	k_mutex_lock(&report_mutex, K_FOREVER);
+
 	uint16_t s = last_button_state;
 
 	uint8_t report[7];
@@ -150,6 +153,8 @@ static void submit_hid_report(void)
 	report[6] = ((s >> 7) & 1) ? 0xFF : 0x80;
 
 	hid_device_submit_report(hid_dev, sizeof(report), report);
+
+	k_mutex_unlock(&report_mutex);
 }
 
 /* Whammy oscillation timer — sends report every 100ms */
@@ -164,8 +169,10 @@ static void whammy_handler(struct k_work *work)
 
 static void send_hid_report(const uint8_t *data, uint16_t len)
 {
+	k_mutex_lock(&report_mutex, K_FOREVER);
 	if (len >= 2) last_button_state = data[0] | (data[1] << 8);
 	else if (len >= 1) last_button_state = data[0];
+	k_mutex_unlock(&report_mutex);
 
 	submit_hid_report();
 }
@@ -185,10 +192,16 @@ static int hid_set_report(const struct device *dev,
 			  const uint16_t len, const uint8_t *const buf)
 { return 0; }
 
+static void hid_input_report_done(const struct device *dev)
+{
+	/* Async completion — nothing to do */
+}
+
 static const struct hid_device_ops hid_ops = {
 	.iface_ready = hid_iface_ready,
 	.get_report = hid_get_report,
 	.set_report = hid_set_report,
+	.input_report_done = hid_input_report_done,
 };
 
 /* ── LED ──────────────────────────────────────────────────────── */
@@ -383,6 +396,8 @@ BT_CONN_CB_DEFINE(conn_callbacks) = {
 int main(void)
 {
 	int err;
+
+	k_mutex_init(&report_mutex);
 
 	/* Init LED */
 	if (gpio_is_ready_dt(&led)) {
