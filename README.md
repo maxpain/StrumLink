@@ -125,7 +125,6 @@ cp update-nice_nano_bootloader-0.10.0_nosd.uf2 /Volumes/NICENANO/
 ## Known issues
 
 - **macOS Apple Silicon** caps USB HID polling at 500Hz (2ms) even though the device requests 1000Hz (1ms). This is an Apple limitation.
-- **Both boards must use bootloader 0.10.0+** — older versions may not work correctly.
 
 ## Project structure
 
