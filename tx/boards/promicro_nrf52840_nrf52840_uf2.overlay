@@ -52,12 +52,12 @@
 			label = "Fret Orange (D6)";
 		};
 		btn_strum_up: btn_strum_up {
-			gpios = <&gpio1 4 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
-			label = "Strum Up (104)";
+			gpios = <&gpio1 6 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Strum Up (106)";
 		};
 		btn_strum_down: btn_strum_down {
-			gpios = <&gpio1 6 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
-			label = "Strum Down (106)";
+			gpios = <&gpio1 4 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "Strum Down (104)";
 		};
 		btn_tilt: btn_tilt {
 			gpios = <&gpio0 6 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;

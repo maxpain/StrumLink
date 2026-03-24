@@ -123,50 +123,52 @@ static int usbd_guitar_init(void)
 /* ── USB HID ──────────────────────────────────────────────────── */
 
 static const struct device *hid_dev;
+static uint16_t last_button_state;
+static uint8_t whammy_toggle;
 
-/*
- * TX bitmask (16 bits):
- *   0=Green, 1=Red, 2=Yellow, 3=Blue, 4=Orange,
- *   5=StrumUp, 6=StrumDown, 7=Tilt, 8=Start, 9=Select, 10=Guide
- *
- * Santroller GH Guitar report (7 bytes):
- *   [0] Report ID = 0x01
- *   [1] Green=b0, Red=b1, Yellow=b2, Blue=b3, Orange=b4, 0=b5, Select=b6, Start=b7
- *   [2] Guide=b0, padding
- *   [3] Hat: 0=StrumUp, 4=StrumDown, 8=Neutral
- *   [4] Whammy
- *   [5] Slider
- *   [6] Tilt (0x80=center, 0xFF=tilted)
- */
-static void send_hid_report(const uint8_t *data, uint16_t len)
+static void submit_hid_report(void)
 {
-	uint16_t s = 0;
-	if (len >= 2) s = data[0] | (data[1] << 8);
-	else if (len >= 1) s = data[0];
+	uint16_t s = last_button_state;
 
 	uint8_t report[7];
 	report[0] = 0x01;
 
-	/* Byte 1: Green=b0..Orange=b4, Select=b6, Start=b7 */
-	report[1] = (s & 0x1F)               /* frets b0-b4 */
-		  | (((s >> 9) & 1) << 6)    /* select → b6 */
-		  | (((s >> 8) & 1) << 7);   /* start  → b7 */
+	report[1] = (s & 0x1F)
+		  | (((s >> 9) & 1) << 6)
+		  | (((s >> 8) & 1) << 7);
 
-	/* Byte 2: Guide=b0 */
 	report[2] = (s >> 10) & 1;
 
-	/* Byte 3: Hat switch (strum) */
 	bool strum_up = (s >> 5) & 1;
 	bool strum_down = (s >> 6) & 1;
 	if (strum_up && !strum_down) report[3] = 0;
 	else if (strum_down && !strum_up) report[3] = 4;
 	else report[3] = 8;
 
-	report[4] = 0xFF; /* Whammy always active */
-	report[5] = 0x00; /* Slider */
-	report[6] = ((s >> 7) & 1) ? 0xFF : 0x80; /* Tilt */
+	whammy_toggle ^= 1;
+	report[4] = whammy_toggle ? 0xFF : 0x80;
+	report[5] = 0x00;
+	report[6] = ((s >> 7) & 1) ? 0xFF : 0x80;
 
 	hid_device_submit_report(hid_dev, sizeof(report), report);
+}
+
+/* Whammy oscillation timer — sends report every 100ms */
+static void whammy_handler(struct k_work *work);
+static K_WORK_DELAYABLE_DEFINE(whammy_work, whammy_handler);
+
+static void whammy_handler(struct k_work *work)
+{
+	submit_hid_report();
+	k_work_schedule(&whammy_work, K_MSEC(100));
+}
+
+static void send_hid_report(const uint8_t *data, uint16_t len)
+{
+	if (len >= 2) last_button_state = data[0] | (data[1] << 8);
+	else if (len >= 1) last_button_state = data[0];
+
+	submit_hid_report();
 }
 
 static void hid_iface_ready(const struct device *dev, const bool ready)
@@ -348,6 +350,7 @@ static void on_connected(struct bt_conn *conn, uint8_t err)
 
 	active_conn = bt_conn_ref(conn);
 	led_set_connected(true);
+	k_work_schedule(&whammy_work, K_MSEC(100));
 	printk("Connected!\n");
 
 	err = bt_gatt_dm_start(conn, &guitar_svc_uuid.uuid,
@@ -360,6 +363,7 @@ static void on_connected(struct bt_conn *conn, uint8_t err)
 static void on_disconnected(struct bt_conn *conn, uint8_t reason)
 {
 	led_set_connected(false);
+	k_work_cancel_delayable(&whammy_work);
 	printk("Disconnected: %u\n", reason);
 
 	if (active_conn) {
