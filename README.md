@@ -71,10 +71,6 @@ The RX dongle presents as a Santroller Guitar Hero Guitar (VID `0x1209`, PID `0x
 ### Prerequisites
 
 - Docker (or OrbStack on macOS)
-- If Docker build fails with pip timeout, set DNS in Docker daemon config (e.g., `~/.orbstack/config/docker.json` for OrbStack):
-  ```json
-  { "dns": ["8.8.8.8", "8.8.4.4"] }
-  ```
 
 ### Setup (one time)
 
